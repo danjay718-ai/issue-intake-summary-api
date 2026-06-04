@@ -1,0 +1,15 @@
+Given this support issue:
+Title: {title}
+Category: {category}
+Priority: {priority}
+Description: {description}
+
+Provide:
+1. A 1-2 sentence summary of the issue
+2. A single concrete next action for the team
+
+Respond in JSON format:
+{
+  "summary": "...",
+  "suggested_next_action": "..."
+}

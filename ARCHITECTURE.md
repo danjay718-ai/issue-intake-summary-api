@@ -70,13 +70,16 @@ QUEUE_CONNECTION=database
 
 **Base path:** `/api/v1`
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/v1/issues` | Create an issue |
-| GET | `/api/v1/issues` | List issues with filters and pagination |
-| GET | `/api/v1/issues/{id}` | View one issue with comments |
-| PATCH | `/api/v1/issues/{id}` | Partially update an issue |
-| POST | `/api/v1/issues/{id}/comments` | Add a comment |
+| Method | Endpoint | Auth required | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | No | Create account, return token |
+| POST | `/api/v1/auth/login` | No | Verify credentials, return token |
+| POST | `/api/v1/auth/logout` | Yes | Revoke current token |
+| POST | `/api/v1/issues` | Yes | Create an issue |
+| GET | `/api/v1/issues` | Yes | List issues with filters and pagination |
+| GET | `/api/v1/issues/{id}` | Yes | View one issue with comments |
+| PATCH | `/api/v1/issues/{id}` | Yes | Partially update an issue |
+| POST | `/api/v1/issues/{id}/comments` | Yes | Add a comment |
 
 Success response shape:
 
@@ -100,13 +103,64 @@ Error response shape:
 
 ---
 
-## 4. Authentication Decision
+## 4. Authentication — Laravel Sanctum
 
-**Decision:** Authentication is not implemented.
+**Decision:** Implement API token authentication using Laravel Sanctum.
 
-**Reasoning:** Authentication and authorization are out of scope for the current deliverable. The assessment is focused on backend API behavior, issue/comment management, async generation, fallback behavior, observability, and tests.
+### Why Sanctum
 
-**Future enhancement:** Laravel Sanctum is the recommended path for API token authentication if this becomes a production service.
+| Factor | Detail |
+|---|---|
+| First-party package | Maintained by the Laravel core team — no third-party risk |
+| Minimal setup | No additional infrastructure; tokens stored in `personal_access_tokens` table |
+| Stateful token revocation | Tokens are rows in the database — deleting the row revokes access immediately, important for an operations context |
+| Single-service fit | Sanctum is purpose-built for single internal APIs; the scope does not require multi-service stateless tokens |
+| Laravel 13 compatible | Ships as a first-class supported package alongside the framework version in use |
+
+### Token Lifecycle
+
+1. **Register** — `POST /api/v1/auth/register` creates a user account and returns a `plainTextToken`.
+2. **Login** — `POST /api/v1/auth/login` verifies credentials via `Auth::attempt()`. On success, a new `api-token` is issued and returned.
+3. **Authenticated requests** — The client sends `Authorization: Bearer {token}` on all protected routes.
+4. **Logout** — `POST /api/v1/auth/logout` calls `currentAccessToken()->delete()`, revoking only the token used for that request. Other sessions remain active.
+
+### Token Storage
+
+Tokens are named `api-token` in the `personal_access_tokens` table. The plain-text token is returned once on creation and never stored. Sanctum stores only the hashed value in the database.
+
+### Route Protection
+
+All issue and comment routes are protected by the `auth:sanctum` middleware. Register and login are intentionally public:
+
+```
+Public  → POST /api/v1/auth/register
+         POST /api/v1/auth/login
+
+Protected (auth:sanctum) → POST   /api/v1/auth/logout
+                            GET    /api/v1/issues
+                            POST   /api/v1/issues
+                            GET    /api/v1/issues/{id}
+                            PATCH  /api/v1/issues/{id}
+                            POST   /api/v1/issues/{id}/comments
+```
+
+### Exception Handling
+
+Unauthenticated requests to protected routes return a consistent JSON 401 via an explicit `AuthenticationException` handler registered in `bootstrap/app.php`:
+
+```json
+{ "success": false, "message": "Unauthenticated", "errors": [] }
+```
+
+### Future Upgrade Path — JWT
+
+When the system grows to serve multiple services or requires stateless token validation (no database hit per request), the correct upgrade path is **JWT via `tymon/jwt-auth`**:
+
+- Same interface contract — swap the auth driver without changing route or controller code
+- Stateless — no `personal_access_tokens` table query per request
+- Standard — interoperable across services and languages
+
+JWT is documented as a roadmap item, not a current requirement. Sanctum is the correct fit for the current single-service scope.
 
 ---
 
@@ -479,7 +533,7 @@ php artisan test
 | Queue tests | Sync | Deterministic tests |
 | AI providers | Anthropic, OpenAI, Gemini | Optional keys |
 | Offline fallback | Rules-based generator | Always available |
-| Auth | Not implemented | Out of scope |
+| Auth | Laravel Sanctum v4.3 | Token-based, DB-backed revocation |
 | Soft deletes | Foundation implemented | No delete endpoint |
 | Tests | PHPUnit via Laravel | `php artisan test` |
 

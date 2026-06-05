@@ -4,6 +4,30 @@ All notable project changes are listed here with the newest state first.
 
 ---
 
+## 2026-06-05 — API Token Authentication via Laravel Sanctum
+
+### Added
+- Installed `laravel/sanctum` v4.3.2 and published the `personal_access_tokens` migration.
+- Added `HasApiTokens` trait to `User` model to enable token issuance and revocation.
+- `AuthController` — handles register, login, and logout with a consistent `ApiResponse` envelope.
+- `StoreRegisterRequest` — validates name, unique email, and confirmed password (min 8 chars).
+- `StoreLoginRequest` — validates email format and non-empty password before credential check.
+- `AuthTest` — 7 named tests covering: register success, duplicate email 422, login success, wrong password 401, unauthenticated 401, authenticated 200, and logout token revocation 401.
+- `error()` method added to `ApiResponse` trait for consistent non-success envelopes.
+
+### Changed
+- `routes/api.php` restructured into two groups: public (register, login) and protected (`auth:sanctum` middleware on logout + all 5 issue/comment routes).
+- `bootstrap/app.php` — added explicit `ValidationException` (422) and `AuthenticationException` (401) handlers before the catch-all `Throwable` handler to prevent swallowing as 500.
+- `IssueApiTest` and `SummaryGenerationTest` — added `setUp()` with `actingAs(User::factory()->create(), 'sanctum')` to authenticate before every test.
+- `ARCHITECTURE.md` — §4 fully rewritten with Sanctum decision rationale, token lifecycle, route protection map, exception handling, and JWT as the documented future upgrade path.
+- `ARCHITECTURE.md` — API endpoint table updated to include all 8 routes with auth requirement column.
+- Stack summary table updated: Auth row changed from "Not implemented" to "Laravel Sanctum v4.3".
+
+### Verified
+- All 18 tests pass with 71 assertions.
+
+---
+
 ## 2026-06-05 — Architecture Documentation Gaps Resolved
 
 ### Changed

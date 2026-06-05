@@ -28,10 +28,21 @@
 - `needs_attention = true` automatically set when priority is `high`
 - `needs_attention` recomputed when priority changes on update
 
-### 4. Consistent API Responses
+### 4. Authentication
+- Token-based API authentication via Laravel Sanctum v4.3
+- `POST /api/v1/auth/register` — create account, returns API token
+- `POST /api/v1/auth/login` — verify credentials, returns API token
+- `POST /api/v1/auth/logout` — revoke current token (requires auth)
+- Tokens named `api-token` in the `personal_access_tokens` table
+- Only the plain-text token is returned once on creation — Sanctum stores only the hash
+- Logout revokes only the current token; other sessions remain active
+- Unauthenticated requests return `401` with a consistent JSON error envelope
+- All issue and comment routes require a valid token
+
+### 5. Consistent API Responses
 - Uniform JSON success shape across all endpoints
 - Uniform JSON error shape across all endpoints — never just a 500
-- Correct HTTP status codes: 200, 201, 202, 204, 400, 404, 422, 500
+- Correct HTTP status codes: 200, 201, 202, 204, 400, 401, 404, 422, 500
 
 ---
 
@@ -153,13 +164,16 @@
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/v1/issues` | Create a new issue |
-| GET | `/api/v1/issues` | List issues with optional filters |
-| GET | `/api/v1/issues/{id}` | View one issue with comments |
-| PATCH | `/api/v1/issues/{id}` | Update an issue |
-| POST | `/api/v1/issues/{id}/comments` | Add a comment to an issue |
+| Method | Endpoint | Auth required | Description |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | No | Create a new account, returns token |
+| POST | `/api/v1/auth/login` | No | Verify credentials, returns token |
+| POST | `/api/v1/auth/logout` | Yes | Revoke current token |
+| POST | `/api/v1/issues` | Yes | Create a new issue |
+| GET | `/api/v1/issues` | Yes | List issues with optional filters |
+| GET | `/api/v1/issues/{id}` | Yes | View one issue with comments |
+| PATCH | `/api/v1/issues/{id}` | Yes | Update an issue |
+| POST | `/api/v1/issues/{id}/comments` | Yes | Add a comment to an issue |
 
 ---
 

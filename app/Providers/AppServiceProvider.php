@@ -19,12 +19,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // The chain order encodes provider priority before the always-on rules fallback.
+        // Gemini is first since it is the active LLM key; Anthropic and OpenAI
+        // activate automatically once their keys are added to .env.
         $this->app->bind(SummaryGeneratorChain::class, function ($app) {
             return new SummaryGeneratorChain([
+                $app->make(GeminiGenerator::class),
                 $app->make(AnthropicGenerator::class),
                 $app->make(OpenAIGenerator::class),
-                $app->make(GeminiGenerator::class),
                 $app->make(RulesBasedGenerator::class),
             ]);
         });

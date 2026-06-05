@@ -22,6 +22,10 @@ class SummaryGenerationLog extends Model
         'duration_ms',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
     protected static function booted(): void
     {
         // Logs are append-only attempt records, so only created_at is maintained.

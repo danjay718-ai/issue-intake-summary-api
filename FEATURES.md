@@ -102,6 +102,8 @@
 - Fields: `id`, `title`, `description`, `priority`, `category`, `status`, `summary`, `suggested_next_action`, `summary_status`, `needs_attention`, `deleted_at`, `created_at`, `updated_at`
 - `summary` and `suggested_next_action` are nullable — null until job completes
 - `summary_status` tracks state: `pending` → `ready` or `failed`
+- `summary_status` defaults to `pending` at the database level (`->default('pending')` in migration) — also set explicitly in the controller on create and reset on description change
+- `status` defaults to `open` at the database level — also set explicitly in the controller on create
 
 ### 14. Comments Table
 - Fields: `id`, `issue_id` (FK), `author_name`, `body`, `created_at`
@@ -131,6 +133,8 @@
 - **Attention status flag:** Asserts priority changes update the `needs_attention` flag accordingly.
 - **Fallback resilience:** Verifies failure of one AI provider cascades correctly to the next provider.
 - **Log audits:** Confirms every summary generation attempt records structured logs.
+
+**Total: 10 named tests, ~48 assertions** across `IssueApiTest` (8 tests) and `SummaryGenerationTest` (2 tests).
 
 ---
 

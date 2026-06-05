@@ -4,6 +4,24 @@ All notable project changes are listed here with the newest state first.
 
 ---
 
+## 2026-06-05 — Architecture Documentation Gaps Resolved
+
+### Changed
+- Patched `ARCHITECTURE.md` to document all features that were fully implemented in code but missing from the architecture document.
+
+### Added to `ARCHITECTURE.md`
+- **§5 Schema Decisions:** Explicit callout that `summary_status` defaults to `pending` at the database level (`->default('pending')` in migration) and is also set in the controller on create and reset on description change. Same clarification added for `status` defaulting to `open`.
+- **§10 HTTP Status Codes:** Full reference table for all 8 status codes in use — `200`, `201`, `202`, `204`, `400`, `404`, `422`, `500` — with the trigger condition for each.
+- **§11 Filtering and Pagination:** Documented all three combinable filter parameters (`status`, `priority`, `category`) with their accepted values and `AND` logic behavior. Added pagination query params (`page`, `per_page`, default `15`) and the full paginated response shape.
+- **§13 Queue Worker:** Documented `php artisan queue:work` as the required command to process background jobs locally. Noted that Docker Compose starts the worker automatically and tests use `sync` driver.
+- **§14 Seeders:** Documented `IssueSeeder` (5 issues spanning all priorities, categories, statuses) and `CommentSeeder` (5 comments across 3 issues), including seed commands and the seeder execution order.
+- **§15 Test Plan:** Full named test inventory — 8 tests in `IssueApiTest` and 2 in `SummaryGenerationTest` — each with a description of what it verifies.
+
+### Verified
+- All documented behaviors confirmed in code before documentation was updated. No code changes were required.
+
+---
+
 ## 2026-06-05 — API Versioning and Enhancements
 
 ### Added

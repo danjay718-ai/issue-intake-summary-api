@@ -191,3 +191,13 @@ Retry a failed job:
 ```bash
 php artisan queue:retry all
 ```
+
+---
+
+## AI Usage
+
+**Claude** (chat) was used during the planning phase to assess the requirements, break them down by feature, and establish prioritization. This produced the feature list, architecture document, and project execution plan — including schema design and architectural decisions.
+
+**OpenAI Codex** and **Antigravity CLI** were used for implementation and documentation, keeping the codebase and its documentation aligned throughout development.
+
+All code in this repository is owned and explainable by the author. Nothing was submitted that cannot be walked through or reasoned about during review.

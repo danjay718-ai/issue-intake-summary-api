@@ -133,7 +133,8 @@ Fields:
 Key choices:
 
 - `summary` and `suggested_next_action` are nullable until the background job completes.
-- `summary_status` makes summary generation state explicit for polling clients.
+- `summary_status` defaults to `pending` on creation at the database level (`->default('pending')` in the migration). It is also set explicitly in the controller on create, and reset to `pending` on description change.
+- `status` defaults to `open` at the database level. It is also set explicitly in the controller on create.
 - `needs_attention` is set synchronously when priority is high.
 - `deleted_at` exists for soft delete foundation, but no delete route is exposed.
 
@@ -294,7 +295,73 @@ All validation errors return HTTP 422 with the shared error shape.
 
 ---
 
-## 10. N+1 Prevention
+## 10. HTTP Status Codes
+
+The API returns the following HTTP status codes:
+
+| Code | When returned |
+|---|---|
+| `200` | Successful GET (list or single issue) and successful PATCH |
+| `201` | Successful POST — issue created or comment added |
+| `202` | Reserved for future async endpoints (not currently used) |
+| `204` | Reserved for future no-content responses (not currently used) |
+| `400` | Malformed request — caught by the global exception handler |
+| `404` | Issue or resource not found — Laravel model binding returns 404 automatically |
+| `422` | Validation failure — returned by all Form Requests with the shared error envelope |
+| `500` | Unhandled server error — caught by the global exception handler |
+
+The `ApiResponse` trait builds success envelopes and accepts any status code. The default success code is `200`; controllers pass `201` explicitly where required.
+
+---
+
+## 11. Filtering and Pagination
+
+### Combinable Filters
+
+The list endpoint (`GET /api/v1/issues`) supports three optional, independently combinable query parameters:
+
+| Parameter | Values | Behavior |
+|---|---|---|
+| `status` | `open`, `in_progress`, `resolved` | Filters by exact status match |
+| `priority` | `low`, `medium`, `high` | Filters by exact priority match |
+| `category` | any string | Filters by exact category match |
+
+Filters are additive — all supplied filters are applied together using `AND` logic:
+
+```
+GET /api/v1/issues?status=open&priority=high&category=billing
+```
+
+Omitting a parameter removes that constraint entirely. Each filter uses Laravel's `when()` builder so unset parameters are skipped without conditional branching in the controller.
+
+### Pagination
+
+The list endpoint always returns paginated results. The pagination shape is Laravel's standard paginator output, nested under `data` in the success envelope:
+
+```json
+{
+  "success": true,
+  "message": "Issues retrieved",
+  "data": {
+    "current_page": 1,
+    "data": [ /* issue objects */ ],
+    "per_page": 15,
+    "total": 42,
+    "last_page": 3,
+    "next_page_url": "...",
+    "prev_page_url": null
+  }
+}
+```
+
+| Query parameter | Default | Description |
+|---|---|---|
+| `per_page` | `15` | Number of results per page |
+| `page` | `1` | Page number to retrieve |
+
+---
+
+## 12. N+1 Prevention
 
 The single issue endpoint loads comments with:
 
@@ -308,7 +375,99 @@ Test coverage asserts the single issue view performs a flat query count regardle
 
 ---
 
-## 11. Current Stack Summary
+## 13. Queue Worker
+
+**Decision:** Use the `database` queue driver locally and document the worker start command explicitly.
+
+To process queued jobs locally, run the worker in a second terminal after starting the server:
+
+```bash
+php artisan queue:work
+```
+
+The worker polls the `jobs` table and executes `GenerateSummaryJob` entries as they are enqueued. Without the worker running, issues will be created successfully (API still returns `201`) but `summary_status` will remain `pending` indefinitely.
+
+In the Docker Compose setup, the worker is started automatically inside the container via the entrypoint script — no manual step is needed.
+
+**Test environment:** Tests use `QUEUE_CONNECTION=sync`, which runs the job inline and does not require a running worker.
+
+---
+
+## 14. Seeders
+
+The project ships with deterministic seeders for reviewer and demo use.
+
+**Command to seed:**
+
+```bash
+php artisan db:seed
+```
+
+Or as part of migration:
+
+```bash
+php artisan migrate --seed
+```
+
+### `IssueSeeder`
+
+Creates 5 issues spanning all required priorities, categories, and statuses:
+
+| Title | Priority | Category | Status |
+|---|---|---|---|
+| Incorrect invoice total | high | billing | open |
+| Checkout crashes | high | bug | in_progress |
+| Bulk export request | medium | feature-request | open |
+| Warehouse access restored | low | access | resolved |
+| Slow order search | medium | performance | in_progress |
+
+Each issue is created with `summary_status = pending` and `needs_attention` set automatically based on priority.
+
+### `CommentSeeder`
+
+Adds 5 comments across the first three seeded issues to simulate team activity:
+
+- Issue 1 (billing): 2 comments (Ava, Noah)
+- Issue 2 (bug): 2 comments (Mia, Leo)
+- Issue 3 (feature-request): 1 comment (Ivy)
+
+`CommentSeeder` runs after `IssueSeeder` since it references issue IDs. Both are called from `DatabaseSeeder`.
+
+---
+
+## 15. Test Plan
+
+The automated test suite uses PHPUnit via `php artisan test`. Tests run against a fresh in-memory database (using `RefreshDatabase`) with the `sync` queue driver so jobs execute inline.
+
+**Run all tests:**
+
+```bash
+php artisan test
+```
+
+### `IssueApiTest` — API behaviour
+
+| Test | What it verifies |
+|---|---|
+| `test_valid_issue_create_returns_pending_issue_and_dispatches_job` | POST returns 201, `summary_status = pending`, `needs_attention = true` for high priority, job dispatched |
+| `test_issue_create_validation_failure_returns_422_and_saves_nothing` | Invalid payload returns 422 with error shape, nothing saved, no job dispatched |
+| `test_issue_list_combines_status_and_priority_filters` | Combined `?status=open&priority=high` filter returns only the matching issue |
+| `test_comment_can_be_added_to_existing_issue` | POST to comments returns 201, input is trimmed, record saved |
+| `test_single_issue_view_eager_loads_comments_without_n_plus_one` | Single issue with 5 comments produces exactly 2 DB queries regardless of comment count |
+| `test_description_update_retriggers_job_and_resets_summary` | PATCH with new description nulls summary fields, sets `summary_status = pending`, dispatches new job |
+| `test_status_update_does_not_retrigger_job` | PATCH with only status change does not dispatch a job |
+| `test_priority_controls_needs_attention_on_create_and_update` | `needs_attention` is set correctly on create and recomputed on priority update |
+
+### `SummaryGenerationTest` — background job behaviour
+
+| Test | What it verifies |
+|---|---|
+| `test_running_job_populates_summary_fields_and_log` | Dispatching the job updates `summary_status = ready`, populates `summary` and `suggested_next_action`, and writes a success log |
+| `test_fallback_chain_logs_failure_then_tries_next_provider` | A failing provider is logged as failed, the chain continues, and the rules-based generator succeeds |
+
+**Total: 10 named tests, ~48 assertions.**
+
+## 16. Current Stack Summary
 
 | Layer | Current Choice | Notes |
 |---|---|---|
@@ -326,7 +485,7 @@ Test coverage asserts the single issue view performs a flat query count regardle
 
 ---
 
-## 12. Future Roadmap
+## 17. Future Roadmap
 
 To support scale and production deployment, the following roadmap features are recommended:
 
@@ -339,7 +498,7 @@ To support scale and production deployment, the following roadmap features are r
 
 ---
 
-## 13. System Design Principles
+## 18. System Design Principles
 
 The architecture is designed to satisfy the core requirements baseline:
 - **Simple Local Setup:** Utilizes an SQLite database and a database-backed queue to minimize environment dependencies.

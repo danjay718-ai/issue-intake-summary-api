@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\GenerateSummaryJob;
 use App\Models\Comment;
 use App\Models\Issue;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -13,6 +14,17 @@ use Tests\TestCase;
 class IssueApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Authenticate as a user before every test in this class.
+     * Required now that all issue and comment routes are behind auth:sanctum.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(User::factory()->create(), 'sanctum');
+    }
 
     public function test_valid_issue_create_returns_pending_issue_and_dispatches_job(): void
     {
@@ -38,10 +50,10 @@ class IssueApiTest extends TestCase
         Queue::fake();
 
         $response = $this->postJson('/api/v1/issues', [
-            'title' => '   ',
+            'title'       => '   ',
             'description' => '',
-            'priority' => 'urgent',
-            'category' => ' ',
+            'priority'    => 'urgent',
+            'category'    => ' ',
         ]);
 
         $response->assertUnprocessable()
@@ -72,7 +84,7 @@ class IssueApiTest extends TestCase
 
         $response = $this->postJson("/api/v1/issues/{$issue->id}/comments", [
             'author_name' => ' Dana ',
-            'body' => ' Please check the payment logs. ',
+            'body'        => ' Please check the payment logs. ',
         ]);
 
         $response->assertCreated()
@@ -80,9 +92,9 @@ class IssueApiTest extends TestCase
             ->assertJsonPath('data.author_name', 'Dana');
 
         $this->assertDatabaseHas('comments', [
-            'issue_id' => $issue->id,
+            'issue_id'    => $issue->id,
             'author_name' => 'Dana',
-            'body' => 'Please check the payment logs.',
+            'body'        => 'Please check the payment logs.',
         ]);
     }
 
@@ -106,9 +118,9 @@ class IssueApiTest extends TestCase
     {
         Queue::fake();
         $issue = Issue::factory()->create([
-            'summary' => 'Old summary',
+            'summary'              => 'Old summary',
             'suggested_next_action' => 'Old action',
-            'summary_status' => 'ready',
+            'summary_status'       => 'ready',
         ]);
 
         $response = $this->patchJson("/api/v1/issues/{$issue->id}", [
@@ -143,7 +155,7 @@ class IssueApiTest extends TestCase
         Queue::fake();
 
         $high = $this->postJson('/api/v1/issues', $this->issuePayload(['priority' => 'high']));
-        $low = $this->postJson('/api/v1/issues', $this->issuePayload(['priority' => 'low']));
+        $low  = $this->postJson('/api/v1/issues', $this->issuePayload(['priority' => 'low']));
 
         $high->assertJsonPath('data.needs_attention', true);
         $low->assertJsonPath('data.needs_attention', false);
@@ -157,10 +169,10 @@ class IssueApiTest extends TestCase
     private function issuePayload(array $overrides = []): array
     {
         return $overrides + [
-            'title' => 'Checkout fails',
+            'title'       => 'Checkout fails',
             'description' => 'The checkout page shows an error after payment.',
-            'priority' => 'medium',
-            'category' => 'bug',
+            'priority'    => 'medium',
+            'category'    => 'bug',
         ];
     }
 }

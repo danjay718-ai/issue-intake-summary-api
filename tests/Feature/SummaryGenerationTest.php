@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\GenerateSummaryJob;
 use App\Models\Issue;
 use App\Models\SummaryGenerationLog;
+use App\Models\User;
 use App\Services\Summary\RulesBasedGenerator;
 use App\Services\Summary\SummaryGeneratorChain;
 use App\Services\Summary\SummaryGeneratorInterface;
@@ -16,11 +17,21 @@ class SummaryGenerationTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Authenticate before every test — all issue routes now require a Sanctum token.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(User::factory()->create(), 'sanctum');
+    }
+
     public function test_running_job_populates_summary_fields_and_log(): void
     {
         $issue = Issue::factory()->create([
-            'description' => 'Order search is slow and timing out.',
-            'category' => 'performance',
+            'description'    => 'Order search is slow and timing out.',
+            'category'       => 'performance',
             'summary_status' => 'pending',
         ]);
 
@@ -34,7 +45,7 @@ class SummaryGenerationTest extends TestCase
         $this->assertDatabaseHas('summary_generation_logs', [
             'issue_id' => $issue->id,
             'provider' => 'rules_based',
-            'status' => 'success',
+            'status'   => 'success',
         ]);
     }
 
@@ -73,11 +84,11 @@ class SummaryGenerationTest extends TestCase
         $this->assertSame(2, SummaryGenerationLog::count());
         $this->assertDatabaseHas('summary_generation_logs', [
             'provider' => 'anthropic',
-            'status' => 'failed',
+            'status'   => 'failed',
         ]);
         $this->assertDatabaseHas('summary_generation_logs', [
             'provider' => 'rules_based',
-            'status' => 'success',
+            'status'   => 'success',
         ]);
     }
 }

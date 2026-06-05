@@ -90,7 +90,7 @@ Base API path:
 /api/v1
 ```
 
-## API
+## API Testing & Authentication Flow
 
 All success responses use:
 
@@ -104,52 +104,129 @@ All validation and error responses use:
 { "success": false, "message": "...", "errors": {} }
 ```
 
-Create an issue:
+Except for registration and login, **all API endpoints require a valid Sanctum token**. Follow these steps to test the API:
+
+### Step 1: Register an Account
+Create a new developer/user account.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "password": "SecurePassword123",
+    "password_confirmation": "SecurePassword123"
+  }'
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "User registered",
+  "data": {
+    "user": {
+      "name": "Jane Doe",
+      "email": "jane@example.com"
+    },
+    "token": "1|abc123xyz..."
+  }
+}
+```
+
+*Copy the `token` value from the response for the subsequent commands.*
+
+---
+
+### Step 2: Login (Alternative to Register)
+If you already registered, authenticate to get a new token.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane@example.com",
+    "password": "SecurePassword123"
+  }'
+```
+
+---
+
+### Step 3: Run Authenticated API Requests
+Include the token in your headers: `-H "Authorization: Bearer {token}"`.
+
+#### A. Create an Issue
+Submitting an issue automatically dispatches a background job to generate a summary.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/issues \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer 1|abc123xyz..." \
   -d '{
-    "title": "Checkout fails",
-    "description": "The checkout page shows an error after payment.",
+    "title": "Checkout page crash",
+    "description": "Getting a 500 error when clicking pay. Timeout occurred.",
     "priority": "high",
     "category": "bug"
   }'
 ```
 
-List issues:
+#### B. List Issues (With Filtering & Pagination)
+Retrieve all issues. Supports filters (`status`, `priority`, `category`) and pagination parameters (`page`, `per_page`).
 
 ```bash
-curl "http://127.0.0.1:8000/api/v1/issues"
-curl "http://127.0.0.1:8000/api/v1/issues?status=open&priority=high"
-curl "http://127.0.0.1:8000/api/v1/issues?status=in_progress&priority=medium&category=performance"
+curl -H "Authorization: Bearer 1|abc123xyz..." "http://127.0.0.1:8000/api/v1/issues"
+curl -H "Authorization: Bearer 1|abc123xyz..." "http://127.0.0.1:8000/api/v1/issues?status=open&priority=high"
 ```
 
-View one issue with comments:
+#### C. View a Single Issue
+Loads the issue details alongside its eager-loaded comments.
 
 ```bash
-curl http://127.0.0.1:8000/api/v1/issues/1
+curl -H "Authorization: Bearer 1|abc123xyz..." http://127.0.0.1:8000/api/v1/issues/1
 ```
 
-Update an issue:
+#### D. Update an Issue
+Partially update issue attributes. Note that changing the `description` resets the summary and triggers regeneration.
 
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/v1/issues/1 \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer 1|abc123xyz..." \
   -d '{"status": "in_progress"}'
 ```
 
-Changing `description` resets `summary`, resets `summary_status` to `pending`, and dispatches a new summary job. Updating `status`, `title`, `priority`, or `category` alone does not regenerate the summary.
-
-Add a comment:
+#### E. Add a Comment
+Add immutable commentary to an issue.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/issues/1/comments \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer 1|abc123xyz..." \
   -d '{
     "author_name": "Dana",
-    "body": "Please check the payment logs."
+    "body": "Please inspect the payment API logs."
   }'
+```
+
+#### F. Audit/Check Summary Generation Logs
+View step-by-step LLM attempts for a specific issue, or inspect the global logs.
+
+```bash
+# Get attempt logs for Issue #1
+curl -H "Authorization: Bearer 1|abc123xyz..." http://127.0.0.1:8000/api/v1/issues/1/summary-logs
+
+# Get all system generation logs (filterable by status/provider)
+curl -H "Authorization: Bearer 1|abc123xyz..." "http://127.0.0.1:8000/api/v1/summary-logs"
+curl -H "Authorization: Bearer 1|abc123xyz..." "http://127.0.0.1:8000/api/v1/summary-logs?provider=gemini&status=failed"
+```
+
+#### G. Logout (Revoke Token)
+Invalidates the current session token.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/logout \
+  -H "Authorization: Bearer 1|abc123xyz..."
 ```
 
 ## Architecture Notes

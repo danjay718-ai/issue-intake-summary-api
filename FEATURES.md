@@ -90,6 +90,9 @@
 - Log captures: `issue_id`, `provider`, `status`, `prompt`, `response`, `error_message`, `duration_ms`, `created_at`
 - Enables debugging, audit trail, and provider performance insight
 - Logs persist even when a provider fails — full history available
+- **Audit Endpoints**: Exposes log retrieval via authenticated endpoints:
+  - `GET /api/v1/issues/{id}/summary-logs` for step-by-step history of a specific issue.
+  - `GET /api/v1/summary-logs` for global paginated search and filters.
 
 ---
 
@@ -144,8 +147,9 @@
 - **Attention status flag:** Asserts priority changes update the `needs_attention` flag accordingly.
 - **Fallback resilience:** Verifies failure of one AI provider cascades correctly to the next provider.
 - **Log audits:** Confirms every summary generation attempt records structured logs.
+- **Log Audit APIs:** Verifies retrieving issue-specific and global summary logs, including filtering.
 
-**Total: 10 named tests, ~48 assertions** across `IssueApiTest` (8 tests) and `SummaryGenerationTest` (2 tests).
+**Total: 20 named tests, 91 assertions** across `IssueApiTest` (8 tests), `SummaryGenerationTest` (2 tests), and `SummaryLogApiTest` (10 tests/assertions).
 
 ---
 

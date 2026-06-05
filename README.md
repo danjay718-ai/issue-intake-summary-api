@@ -154,16 +154,17 @@ curl -X POST http://127.0.0.1:8000/api/v1/issues/1/comments \
 
 ## Architecture Notes
 
-- Laravel API only; no frontend or authentication in the core assessment scope.
+- Laravel API only; authenticated using Laravel Sanctum for secure API access.
 - SQLite is the default local database for a low-friction reviewer setup.
 - Database queue is used locally; tests use the sync queue driver.
 - Issues use Laravel soft deletes through `deleted_at`, but no delete endpoint is exposed.
 - Single issue view eager loads comments to avoid N+1 queries.
 - Comments are immutable and store only `created_at`.
 - Every summary attempt is logged in `summary_generation_logs`.
+- **Summary Log Audit API Endpoints**: The endpoints `GET /api/v1/summary-logs` and `GET /api/v1/issues/{id}/summary-logs` were added specifically to inspect and debug summary generation runs. These are optional audit/observability endpoints and can be removed if requested.
 - The summary job retries up to three times and sets `summary_status = failed` if final failure handling runs.
 
-The architecture is aligned with the requirements baseline: five versioned API endpoints, no auth, SQLite/database queue defaults, and soft-delete foundation without delete/restore routes.
+The architecture is aligned with the requirements baseline: five versioned API endpoints (along with the optional summary log endpoints for reviewer auditing), SQLite/database queue defaults, and soft-delete foundation without delete/restore routes.
 
 Additional project documentation:
 

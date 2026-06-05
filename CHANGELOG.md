@@ -4,6 +4,27 @@ All notable project changes are listed here with the newest state first.
 
 ---
 
+## 2026-06-05 — Summary Generation Logs Audit Endpoints and Priority Fix
+
+### Added
+- `SummaryLogController` — Exposes the append-only summary generation logs table through two RESTful JSON endpoints:
+  - `GET /api/v1/issues/{issue}/summary-logs` (step-by-step history for a specific issue)
+  - `GET /api/v1/summary-logs` (global audit log table with pagination and filters by provider/status)
+- `SummaryLogApiTest` — Verifies authentication, pagination, structure, and filters for all summary log audit endpoints.
+
+### Changed
+- `AppServiceProvider` — Reordered the fallback chain to promote Gemini first, so that the application attempts Gemini generation immediately without failing on non-configured Anthropic/OpenAI providers.
+- `SummaryGenerationLog` model — Added `$casts` property for `created_at => datetime` to ensure Carbon instances are returned, resolving ISO8601 formatting serialization issues.
+- `SummaryLogController` — Configured sorting by ID descending (`latest('id')`) instead of `created_at` to guarantee deterministic, chronological ordering when logs are generated in the same second.
+- `routes/api.php` — Protected all log audit endpoints with Sanctum (`auth:sanctum` middleware).
+- `ARCHITECTURE.md` — Updated API Design tables, route protection diagrams, and testing section with the new endpoints and test cases.
+- `FEATURES.md` — Updated Observability and Testing specifications.
+
+### Verified
+- Executed all 20 tests in the test suite (`./vendor/bin/phpunit`). All tests passed successfully (91 assertions).
+
+---
+
 ## 2026-06-05 — API Token Authentication via Laravel Sanctum
 
 ### Added

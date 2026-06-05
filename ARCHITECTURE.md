@@ -15,8 +15,8 @@ The architecture is intentionally aligned to the agreed requirements baseline:
 
 - Backend API only
 - No frontend in the current scope
-- No authentication in the current scope
-- Five versioned REST API endpoints under `/api/v1`
+- API token authentication implemented using Laravel Sanctum
+- Versioned REST API endpoints under `/api/v1`
 - SQLite as the default local database
 - Database queue locally, sync queue in tests
 - Soft delete foundation on issues, with no delete endpoint exposed
@@ -80,6 +80,11 @@ QUEUE_CONNECTION=database
 | GET | `/api/v1/issues/{id}` | Yes | View one issue with comments |
 | PATCH | `/api/v1/issues/{id}` | Yes | Partially update an issue |
 | POST | `/api/v1/issues/{id}/comments` | Yes | Add a comment |
+| GET | `/api/v1/issues/{id}/summary-logs` | Yes | View summary generation attempts for an issue |
+| GET | `/api/v1/summary-logs` | Yes | List all summary generation logs (global audit trail) |
+
+> [!NOTE]
+> The summary log audit endpoints (`/api/v1/summary-logs` and `/api/v1/issues/{id}/summary-logs`) were added purely to allow auditing and debugging of the LLM summary generation attempts. They are optional additions and can be fully removed if requested.
 
 Success response shape:
 
@@ -142,6 +147,8 @@ Protected (auth:sanctum) → POST   /api/v1/auth/logout
                             GET    /api/v1/issues/{id}
                             PATCH  /api/v1/issues/{id}
                             POST   /api/v1/issues/{id}/comments
+                            GET    /api/v1/issues/{id}/summary-logs
+                            GET    /api/v1/summary-logs
 ```
 
 ### Exception Handling
@@ -519,7 +526,14 @@ php artisan test
 | `test_running_job_populates_summary_fields_and_log` | Dispatching the job updates `summary_status = ready`, populates `summary` and `suggested_next_action`, and writes a success log |
 | `test_fallback_chain_logs_failure_then_tries_next_provider` | A failing provider is logged as failed, the chain continues, and the rules-based generator succeeds |
 
-**Total: 10 named tests, ~48 assertions.**
+### `SummaryLogApiTest` — log retrieval and filtering
+
+| Test | What it verifies |
+|---|---|
+| `test_get_summary_logs_for_issue` | GET returns log history for a specific issue, sorted by ID descending |
+| `test_get_global_summary_logs` | GET returns paginated logs, supports filtering by provider and status |
+
+**Total: 20 named tests, 91 assertions.**
 
 ## 16. Current Stack Summary
 

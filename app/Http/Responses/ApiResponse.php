@@ -5,7 +5,7 @@ namespace App\Http\Responses;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Provides the shared success response envelope used by API controllers.
+ * Provides shared success and error response envelopes used by API controllers.
  */
 trait ApiResponse
 {
@@ -17,7 +17,18 @@ trait ApiResponse
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data' => $data,
+            'data'    => $data,
+        ], $status);
+    }
+
+    /**
+     * Build a consistent error response: { success, message }.
+     */
+    protected function error(string $message, int $status = 400): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message,
         ], $status);
     }
 }

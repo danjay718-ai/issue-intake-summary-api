@@ -67,10 +67,24 @@ return Application::configure(basePath: dirname(__DIR__))
 
             report($exception);
 
-            return response()->json([
+            $response = [
                 'success' => false,
-                'message' => 'Server error',
-                'errors' => [],
-            ], 500);
+                'message' => config('app.debug') ? $exception->getMessage() : 'Server error',
+                'errors'  => [],
+            ];
+
+            if (config('app.debug')) {
+                $response['exception'] = get_class($exception);
+                $response['file']      = $exception->getFile();
+                $response['line']      = $exception->getLine();
+                $response['trace']     = collect($exception->getTrace())->take(10)->map(fn ($trace) => [
+                    'file'     => $trace['file'] ?? null,
+                    'line'     => $trace['line'] ?? null,
+                    'function' => $trace['function'] ?? null,
+                    'class'    => $trace['class'] ?? null,
+                ])->all();
+            }
+
+            return response()->json($response, 500);
         });
     })->create();
